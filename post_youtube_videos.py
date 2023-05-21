@@ -4,6 +4,7 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from tqdm import tqdm
+from datetime import timedelta
 from lib.args import args
 
 # Set up the YouTube API client
@@ -17,13 +18,12 @@ flow = InstalledAppFlow.from_client_secrets_file(
 credentials = flow.run_local_server(port=0)
 youtube = build('youtube', 'v3', credentials=credentials)
 
-# Define the parameters for the new video
-video_path = args.inputs
-title = os.path.dirname(args.inputs).split('/')[-1]
-description = title + '\nSome description...'
-
-def post_video(path):
+def post_video(path, date):
     """ Upload the new video """
+    
+    # Define the parameters for the new video
+    title = os.path.dirname(path).split('/')[-1]
+    description = title + '\nSome description...'
     
     try:
         # Create the video resource
@@ -37,7 +37,7 @@ def post_video(path):
             # publish at a specific date
             'status': {
                 'privacyStatus': 'private',
-                'publishAt': args.date.isoformat()
+                'publishAt': date
             }
         }
 
@@ -46,7 +46,7 @@ def post_video(path):
         insert_response = youtube.videos().insert(
             part='snippet,status',
             body=video_resource,
-            media_body=MediaFileUpload(video_path)
+            media_body=MediaFileUpload(path)
         ).execute()
 
         id = insert_response["id"]
@@ -62,16 +62,18 @@ if args.unique:
             print(f'{args.inputs} is not a directory')
             exit()
             
-        post_video(args.inputs)
+        post_video(args.inputs, args.date.isoformat())
         exit()
         
-for directory in tqdm(os.listdir(args.inputs), desc='directories', position=1):
+for index, directory in enumerate(tqdm(os.listdir(args.inputs), desc='directories', position=1)):
     
     path = os.path.join(args.inputs, directory)
     if not os.path.isdir(path):
         tqdm.write(f'{path} is not a directory')
         continue
     
-    post_video(path)
+    date = args.date + timedelta(day=index)
+    
+    post_video(path, date.isoformat())
     
     
